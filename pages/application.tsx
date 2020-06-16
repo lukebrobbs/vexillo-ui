@@ -1,24 +1,22 @@
 import React, { FunctionComponent, useReducer } from "react";
+import axios from "axios";
 
 interface CreateAppState {
-  appName: string;
-  project: string;
+  status: "IDLE" | "FETCHING" | "ERROR";
+  form: {
+    name: string;
+    description: string;
+    createdBy: string;
+    flags: [];
+  };
 }
 
-interface CreateAppEvent {
-  type: "SET_APP_NAME" | "SET_APP_PROJECT";
-}
-interface SetAppNameEvent extends CreateAppEvent {
-  type: "SET_APP_NAME";
-  appName: string;
-}
-
-interface SetAppProjectEvent {
-  type: "SET_PROJECT_NAME";
-  project: string;
-}
-
-type ReducerEvent = SetAppNameEvent | SetAppProjectEvent;
+type ReducerEvent =
+  | { type: "SET_APP_NAME"; name: string }
+  | { type: "SET_APP_DESCRIPTION"; description: string }
+  | { type: "SUBMIT_FORM" }
+  | { type: "SUBMIT_FORM_SUCCESS" }
+  | { type: "SUBMIT_FORM_FAIL" };
 
 const newAppFormReducer = (
   state: CreateAppState,
@@ -28,39 +26,95 @@ const newAppFormReducer = (
     case "SET_APP_NAME":
       return {
         ...state,
-        appName: event.appName,
+        form: {
+          ...state.form,
+          name: event.name,
+        },
       };
-    case "SET_PROJECT_NAME":
+    case "SET_APP_DESCRIPTION":
       return {
         ...state,
-        project: event.project,
+        form: {
+          ...state.form,
+          description: event.description,
+        },
       };
+    case "SUBMIT_FORM":
+      return {
+        ...state,
+        form: {
+          ...state.form,
+        },
+        status: "FETCHING",
+      };
+    case "SUBMIT_FORM_FAIL":
+      return {
+        ...state,
+        form: {
+          ...state.form,
+        },
+        status: "ERROR",
+      };
+    case "SUBMIT_FORM_SUCCESS":
+      return intialState;
   }
 };
 
 const intialState: CreateAppState = {
-  appName: "",
-  project: "",
+  status: "IDLE",
+  form: {
+    name: "",
+    description: "",
+    createdBy: "Tague",
+    flags: [],
+  },
 };
 
 const Application: FunctionComponent = () => {
   const [state, dispatch] = useReducer(newAppFormReducer, intialState);
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    dispatch({ type: "SUBMIT_FORM" });
+
+    axios
+      .post(`${process.env.NEXT_PUBLIC_API_URL}/applications`, state.form)
+      .then(() => {
+        dispatch({ type: "SUBMIT_FORM_SUCCESS" });
+      })
+      .catch(() => {
+        dispatch({ type: "SUBMIT_FORM_FAIL" });
+      });
+  };
+
+  if (state.status === "FETCHING") {
+    return <p>Loading...</p>;
+  }
+
+  if (state.status === "ERROR") {
+    return <p>Oops, something went wrong</p>;
+  }
 
   return (
-    <form>
+    <form onSubmit={handleSubmit}>
       <h1>Add new application</h1>
+      <label htmlFor="appName">Name</label>
       <input
-        value={state.appName}
+        id="appName"
+        value={state.form.name}
         onChange={(e) =>
-          dispatch({ type: "SET_APP_NAME", appName: e.target.value })
+          dispatch({ type: "SET_APP_NAME", name: e.target.value })
         }
       />
-      <input
-        value={state.project}
+      <label htmlFor="appDescription">Description</label>
+
+      <textarea
+        id="appDescription"
+        value={state.form.description}
         onChange={(e) =>
-          dispatch({ type: "SET_PROJECT_NAME", project: e.target.value })
+          dispatch({ type: "SET_APP_DESCRIPTION", description: e.target.value })
         }
       />
+      <button>SUBMIT</button>
     </form>
   );
 };
